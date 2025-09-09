@@ -4,9 +4,7 @@
   "description": "A webhook service to integrate Jira releases with Slack notifications",
   "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
-    "build": "vercel build",
-    "deploy": "vercel --prod",
+    "dev": "node index.js",
     "start": "node index.js"
   },
   "keywords": ["jira", "webhook", "slack", "vercel", "serverless"],
