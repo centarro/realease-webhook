@@ -130,6 +130,18 @@ function validateEnvironmentVariables() {
   if (missing.length > 0) {
     throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   }
+
+  // Validate JIRA_BASE_URL format
+  const jiraUrl = process.env.JIRA_BASE_URL;
+  if (!jiraUrl.startsWith('http://') && !jiraUrl.startsWith('https://')) {
+    throw new Error('JIRA_BASE_URL must be a valid URL starting with http:// or https://');
+  }
+
+  // Validate SLACK_WEBHOOK_URL format
+  const slackUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!slackUrl.startsWith('https://hooks.slack.com/')) {
+    throw new Error('SLACK_WEBHOOK_URL must be a valid Slack webhook URL');
+  }
 }
 
 function validateRequestBody(body) {
