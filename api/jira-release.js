@@ -141,7 +141,7 @@ async function sendSlackNotification(issueDetails) {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `🚀 *New Release*\n*${issueDetails.summary}*`
+          text: `🚀 *New Release* *${issueDetails.summary}*`
         }
       }
     ];
