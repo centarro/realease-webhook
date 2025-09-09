@@ -1,16 +1,4 @@
 {
-  "version": 2,
-  "name": "jira-release-webhook",
-  "routes": [
-    {
-      "src": "/health",
-      "dest": "/api/health.js"
-    },
-    {
-      "src": "/jira-release",
-      "dest": "/api/jira-release.js"
-    }
-  ],
   "functions": {
     "api/**/*.js": {
       "maxDuration": 30
