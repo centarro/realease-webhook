@@ -56,53 +56,21 @@ async function sendSlackNotification(issueDetails) {
           }
         },
         {
-          type: "section",
-          fields: [
+          type: "actions",
+          elements: [
             {
-              type: "mrkdwn",
-              text: `*Type:*\n${issueDetails.issueType}`
-            },
-            {
-              type: "mrkdwn",
-              text: `*Status:*\n${issueDetails.status}`
-            },
-            {
-              type: "mrkdwn",
-              text: `*Priority:*\n${issueDetails.priority}`
-            },
-            {
-              type: "mrkdwn",
-              text: `*Assignee:*\n${issueDetails.assignee}`
+              type: "button",
+              text: {
+                type: "plain_text",
+                text: "View in Jira"
+              },
+              url: issueDetails.url,
+              action_id: "view_jira_issue"
             }
           ]
         }
       ]
     };
-
-    if (issueDetails.description && issueDetails.description !== 'No description') {
-      slackMessage.blocks.push({
-        type: "section",
-        text: {
-          type: "mrkdwn",
-          text: `*Description:*\n${issueDetails.description.substring(0, 300)}${issueDetails.description.length > 300 ? '...' : ''}`
-        }
-      });
-    }
-
-    slackMessage.blocks.push({
-      type: "actions",
-      elements: [
-        {
-          type: "button",
-          text: {
-            type: "plain_text",
-            text: "View in Jira"
-          },
-          url: issueDetails.url,
-          action_id: "view_jira_issue"
-        }
-      ]
-    });
 
     const response = await fetch(SLACK_WEBHOOK_URL, {
       method: 'POST',
