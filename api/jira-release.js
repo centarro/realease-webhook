@@ -9,7 +9,7 @@ const SLACK_WEBHOOK_URL = process.env.SLACK_WEBHOOK_URL;
 async function getJiraIssueDetails(issueKey) {
   try {
     const auth = Buffer.from(`${JIRA_EMAIL}:${JIRA_API_TOKEN}`).toString('base64');
-    const url = `${JIRA_BASE_URL}/rest/api/3/issue/${issueKey}`;
+    const url = `${JIRA_BASE_URL}/rest/api/3/issue/${issueKey}?expand=issuelinks`;
     
     const response = await fetch(url, {
       method: 'GET',
@@ -25,17 +25,26 @@ async function getJiraIssueDetails(issueKey) {
     }
 
     const issue = await response.json();
+    
+    // Extract blocking issues
+    const blockingIssues = [];
+    if (issue.fields.issuelinks) {
+      for (const link of issue.fields.issuelinks) {
+        // Check if this issue was blocked by another issue
+        if (link.type.name === 'Blocks' && link.inwardIssue) {
+          blockingIssues.push({
+            key: link.inwardIssue.key,
+            summary: link.inwardIssue.fields.summary
+          });
+        }
+      }
+    }
+    
     return {
       key: issue.key,
       summary: issue.fields.summary,
-      description: issue.fields.description?.content?.[0]?.content?.[0]?.text || 'No description',
-      status: issue.fields.status.name,
-      assignee: issue.fields.assignee?.displayName || 'Unassigned',
-      priority: issue.fields.priority?.name || 'None',
-      issueType: issue.fields.issuetype.name,
       url: `${JIRA_BASE_URL}/browse/${issue.key}`,
-      created: issue.fields.created,
-      updated: issue.fields.updated
+      blockingIssues: blockingIssues
     };
   } catch (error) {
     console.error('Error fetching Jira issue details:', error);
@@ -45,31 +54,50 @@ async function getJiraIssueDetails(issueKey) {
 
 async function sendSlackNotification(issueDetails) {
   try {
-    const slackMessage = {
-      text: `🚀 *New Release: ${issueDetails.key}*`,
-      blocks: [
+    const blocks = [
+      {
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `🚀 *New Release: ${issueDetails.key}*\n*${issueDetails.summary}*`
+        }
+      }
+    ];
+
+    // Add blocking issues if any exist
+    if (issueDetails.blockingIssues && issueDetails.blockingIssues.length > 0) {
+      const blockingText = issueDetails.blockingIssues
+        .map(issue => `• ${issue.key}: ${issue.summary}`)
+        .join('\n');
+      
+      blocks.push({
+        type: "section",
+        text: {
+          type: "mrkdwn",
+          text: `*Issues included in this release:*\n${blockingText}`
+        }
+      });
+    }
+
+    // Add the action button
+    blocks.push({
+      type: "actions",
+      elements: [
         {
-          type: "section",
+          type: "button",
           text: {
-            type: "mrkdwn",
-            text: `🚀 *New Release: ${issueDetails.key}*\n*${issueDetails.summary}*`
-          }
-        },
-        {
-          type: "actions",
-          elements: [
-            {
-              type: "button",
-              text: {
-                type: "plain_text",
-                text: "View in Jira"
-              },
-              url: issueDetails.url,
-              action_id: "view_jira_issue"
-            }
-          ]
+            type: "plain_text",
+            text: "View in Jira"
+          },
+          url: issueDetails.url,
+          action_id: "view_jira_issue"
         }
       ]
+    });
+
+    const slackMessage = {
+      text: `🚀 *New Release: ${issueDetails.key}*`,
+      blocks: blocks
     };
 
     const response = await fetch(SLACK_WEBHOOK_URL, {
