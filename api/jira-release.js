@@ -228,6 +228,28 @@ function validateEnvironmentVariables() {
   }
 }
 
+function validateRequestOrigin(req) {
+  const referer = req.headers.referer || req.headers.origin;
+  const userAgent = req.headers['user-agent'] || '';
+  
+  // Check if request comes from the configured Jira instance
+  if (referer && !referer.startsWith(JIRA_BASE_URL)) {
+    throw new Error(`Unauthorized request origin. Expected requests from ${JIRA_BASE_URL}`);
+  }
+  
+  // Additional check for Jira user agent (Jira typically sends requests with identifiable user agent)
+  const isFromJira = userAgent.toLowerCase().includes('atlassian') || 
+                    userAgent.toLowerCase().includes('jira') ||
+                    userAgent.toLowerCase().includes('automation');
+  
+  // If we have a referer that doesn't match our Jira instance, reject
+  if (referer && !referer.startsWith(JIRA_BASE_URL) && !isFromJira) {
+    throw new Error('Request does not appear to be from authorized Jira instance');
+  }
+  
+  return true;
+}
+
 function validateRequestBody(body) {
   if (!body || typeof body !== 'object') {
     throw new Error('Request body must be a valid JSON object');
@@ -262,8 +284,18 @@ module.exports = async (req, res) => {
     // Validate environment variables
     validateEnvironmentVariables();
     
+    // Validate request origin for security
+    validateRequestOrigin(req);
+    
     // Validate request body
     validateRequestBody(req.body);
+    
+    console.log('Webhook request details:', {
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      userAgent: req.headers['user-agent'],
+      issueKey: req.body.issue.key
+    });
     
     console.log('Received webhook payload:', JSON.stringify(req.body, null, 2));
     
