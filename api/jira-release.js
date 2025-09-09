@@ -141,7 +141,7 @@ async function sendSlackNotification(issueDetails) {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `🚀 *New Release: ${issueDetails.key}*\n*${issueDetails.summary}*`
+          text: `🚀 *New Release*\n*${issueDetails.summary}*`
         }
       }
     ];
@@ -151,9 +151,9 @@ async function sendSlackNotification(issueDetails) {
       const blockingText = issueDetails.blockingIssues
         .map(issue => {
           if (issue.drupalUrl) {
-            return `• <${issue.drupalUrl}|${issue.key}>: ${issue.summary}`;
+            return `• <${issue.drupalUrl}|${issue.summary}>`;
           } else {
-            return `• ${issue.key}: ${issue.summary}`;
+            return `• ${issue.summary}`;
           }
         })
         .join('\n');
@@ -184,7 +184,7 @@ async function sendSlackNotification(issueDetails) {
     });
 
     const slackMessage = {
-      text: `🚀 *New Release: ${issueDetails.key}*`,
+      text: `🚀 *New Release*`,
       blocks: blocks
     };
 
