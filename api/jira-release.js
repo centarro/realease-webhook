@@ -26,16 +26,15 @@ async function getJiraIssueDetails(issueKey) {
 
     const issue = await response.json();
     
-    // Extract blocking issues
+    // Extract blocking issues with their Drupal Issue IDs
     const blockingIssues = [];
     if (issue.fields.issuelinks) {
       for (const link of issue.fields.issuelinks) {
         // Check if this issue was blocked by another issue
         if (link.type.name === 'Blocks' && link.inwardIssue) {
-          blockingIssues.push({
-            key: link.inwardIssue.key,
-            summary: link.inwardIssue.fields.summary
-          });
+          // Get detailed info for the blocking issue to fetch Drupal Issue ID
+          const blockingIssueDetails = await getBlockingIssueDetails(link.inwardIssue.key, auth);
+          blockingIssues.push(blockingIssueDetails);
         }
       }
     }
@@ -49,6 +48,89 @@ async function getJiraIssueDetails(issueKey) {
   } catch (error) {
     console.error('Error fetching Jira issue details:', error);
     throw error;
+  }
+}
+
+async function getBlockingIssueDetails(issueKey, auth) {
+  try {
+    const url = `${JIRA_BASE_URL}/rest/api/3/issue/${issueKey}`;
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch blocking issue ${issueKey}: ${response.status}`);
+      return {
+        key: issueKey,
+        summary: 'Could not fetch issue details',
+        drupalUrl: null
+      };
+    }
+
+    const issue = await response.json();
+    
+    // Look for Drupal Issue ID in custom fields
+    let drupalIssueId = null;
+    const fields = issue.fields;
+    
+    // First, try to get field metadata to find the exact field ID for "Drupal Issue ID"
+    try {
+      const fieldsResponse = await fetch(`${JIRA_BASE_URL}/rest/api/3/field`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (fieldsResponse.ok) {
+        const fieldDefinitions = await fieldsResponse.json();
+        const drupalField = fieldDefinitions.find(field => 
+          field.name && field.name.toLowerCase().includes('drupal') && 
+          field.name.toLowerCase().includes('issue') &&
+          field.name.toLowerCase().includes('id')
+        );
+        
+        if (drupalField && fields[drupalField.id]) {
+          drupalIssueId = fields[drupalField.id];
+        }
+      }
+    } catch (fieldError) {
+      console.error('Error fetching field definitions:', fieldError);
+    }
+    
+    // Fallback: Search for numeric custom fields if the specific field wasn't found
+    if (!drupalIssueId) {
+      for (const fieldKey in fields) {
+        const fieldValue = fields[fieldKey];
+        if (fieldKey.includes('customfield') && fieldValue) {
+          if (typeof fieldValue === 'number' || (typeof fieldValue === 'string' && /^\d+$/.test(fieldValue))) {
+            drupalIssueId = fieldValue;
+            break;
+          }
+        }
+      }
+    }
+    
+    return {
+      key: issue.key,
+      summary: issue.fields.summary,
+      drupalUrl: drupalIssueId ? `https://www.drupal.org/i/${drupalIssueId}` : null,
+      drupalIssueId: drupalIssueId
+    };
+  } catch (error) {
+    console.error(`Error fetching blocking issue ${issueKey}:`, error);
+    return {
+      key: issueKey,
+      summary: 'Could not fetch issue details',
+      drupalUrl: null
+    };
   }
 }
 
@@ -67,7 +149,13 @@ async function sendSlackNotification(issueDetails) {
     // Add blocking issues if any exist
     if (issueDetails.blockingIssues && issueDetails.blockingIssues.length > 0) {
       const blockingText = issueDetails.blockingIssues
-        .map(issue => `• ${issue.key}: ${issue.summary}`)
+        .map(issue => {
+          if (issue.drupalUrl) {
+            return `• <${issue.drupalUrl}|${issue.key}>: ${issue.summary}`;
+          } else {
+            return `• ${issue.key}: ${issue.summary}`;
+          }
+        })
         .join('\n');
       
       blocks.push({
