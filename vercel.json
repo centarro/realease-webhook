@@ -1,0 +1,31 @@
+{
+  "version": 2,
+  "name": "jira-release-webhook",
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/health",
+      "dest": "/api/health.js"
+    },
+    {
+      "src": "/jira-release",
+      "dest": "/api/jira-release.js"
+    }
+  ],
+  "env": {
+    "JIRA_BASE_URL": "@jira_base_url",
+    "JIRA_EMAIL": "@jira_email", 
+    "JIRA_API_TOKEN": "@jira_api_token",
+    "SLACK_WEBHOOK_URL": "@slack_webhook_url"
+  },
+  "functions": {
+    "api/**/*.js": {
+      "maxDuration": 30
+    }
+  }
+}
